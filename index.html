@@ -1,0 +1,687 @@
+<!-- 
+  ==========================================================================
+  GOOGLE APPS SCRIPT BACKEND CODE (Paste this into Code.gs)
+  ==========================================================================
+  IMPORTANT: You must follow these steps TWICE (once for each setup: Setup 1 and Setup 2)
+  
+  1. Open your Google Sheet (for Setup 1 or 2).
+  2. Extensions > Apps Script.
+  3. Create index.html and paste everything below this comment block into it.
+  4. Paste the code below in Code.gs.
+  5. Replace FOLDER_ID with the ID for THIS setup's drive folder.
+  6. Deploy as Web App (Access: Anyone).
+  
+  const FOLDER_ID = 'YOUR_DRIVE_FOLDER_ID'; // Change this for EACH setup!
+
+  function doGet(e) {
+    if (e.parameter.read) {
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+      const data = sheet.getDataRange().getValues();
+      const headers = data.shift();
+      const latestRow = data[data.length - 1];
+      
+      let latestImageUrl = "";
+      try {
+        const folder = DriveApp.getFolderById(FOLDER_ID);
+        const files = folder.getFilesByType(MimeType.JPEG);
+        let latestFile = null;
+        let maxTimestamp = 0;
+        while (files.hasNext()) {
+          const file = files.next();
+          const name = file.getName();
+          const timestampMatch = name.match(/\d+/);
+          if (timestampMatch) {
+            const ts = parseInt(timestampMatch[0]);
+            if (ts > maxTimestamp) {
+              maxTimestamp = ts;
+              latestFile = file;
+            }
+          }
+        }
+        if (latestFile) {
+          latestImageUrl = latestFile.getUrl().replace("open?id=", "uc?export=view&id=");
+        }
+      } catch (fErr) { console.log(fErr); }
+      
+      const historyData = data.slice(-10);
+      const response = {
+        latest: {
+          timestamp: latestRow ? latestRow[0] : null,
+          moisture: latestRow ? latestRow[1] : null,
+          temp: latestRow ? latestRow[2] : null,
+          image: latestImageUrl || (latestRow ? latestRow[3] : "")
+        },
+        history: historyData.map(row => ({ timestamp: row[0], moisture: row[1], temp: row[2] }))
+      };
+      return ContentService.createTextOutput(JSON.stringify(response)).setMimeType(ContentService.MimeType.JSON);
+    }
+    const val = e.parameter.value;
+    const temp = e.parameter.temp;
+    if (val && temp) {
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+      sheet.appendRow([new Date(), val, temp, e.parameter.image || ""]);
+      return ContentService.createTextOutput("Data Logged Successfully");
+    }
+    return ContentService.createTextOutput("Google Apps Script API is Running.");
+  }
+
+  function doPost(e) {
+    try {
+      const data = JSON.parse(e.postData.contents);
+      if (data.action === 'uploadImage') {
+        const folder = DriveApp.getFolderById(FOLDER_ID);
+        const fileName = "Plant_" + new Date().getTime() + ".jpg";
+        const blob = Utilities.newBlob(Utilities.base64Decode(data.image), "image/jpeg", fileName);
+        const file = folder.createFile(blob);
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        return ContentService.createTextOutput(file.getUrl().replace("open?id=", "uc?export=view&id="));
+      }
+    } catch (err) { return ContentService.createTextOutput("Error: " + err.toString()); }
+  }
+  ==========================================================================
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strawberry Plantation Dashboard</title>
+    <!-- Modern Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <!-- Chart.js for premium data visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        /* Modern Premium Aesthetics - Glassmorphism & Dark Mode */
+        :root {
+            --bg-dark: #09090b;
+            --bg-grad-1: #18181b;
+            --glass-bg: rgba(39, 39, 42, 0.4);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-hover-border: rgba(255, 255, 255, 0.2);
+            --text-main: #f4f4f5;
+            --text-muted: #a1a1aa;
+
+            --accent-freq-glow: #10b981;
+            /* Emerald */
+            --accent-freq-grad: linear-gradient(135deg, #34d399, #059669);
+
+            --accent-nofreq-glow: #f43f5e;
+            /* Rose */
+            --accent-nofreq-grad: linear-gradient(135deg, #fb7185, #e11d48);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-dark);
+            background-image:
+                radial-gradient(circle at 10% 20%, rgba(16, 185, 129, 0.1) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(244, 63, 94, 0.1) 0%, transparent 40%);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 1rem;
+        }
+
+        .dashboard-wrapper {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        /* Header Styles */
+        header {
+            text-align: center;
+            margin-bottom: 0.5rem;
+            position: relative;
+        }
+
+        header h1 {
+            font-size: clamp(2rem, 4vw, 3rem);
+            font-weight: 800;
+            letter-spacing: -1px;
+            background: linear-gradient(90deg, #ffffff, #a1a1aa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.3rem;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: clamp(0.9rem, 2vw, 1.1rem);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Glass Panel Components */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 1.2rem;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .glass-panel:hover {
+            border-color: var(--glass-hover-border);
+        }
+
+        /* Top Summary Section Layout */
+        .summary-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        /* Setup Cards - Compact Layout */
+        .setup-card {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            padding-bottom: 0.3rem;
+            margin-bottom: 0.2rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .setup-freq .status-dot {
+            background: var(--accent-freq-glow);
+            box-shadow: 0 0 10px var(--accent-freq-glow);
+        }
+
+        .setup-nofreq .status-dot {
+            background: var(--accent-nofreq-glow);
+            box-shadow: 0 0 10px var(--accent-nofreq-glow);
+        }
+
+        /* metric column layouts */
+        .setup-content {
+            display: flex;
+            gap: 1.2rem;
+            align-items: stretch;
+        }
+
+        .metrics-column {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+            flex-grow: 1;
+            justify-content: space-between;
+        }
+
+        /* Metric Cards - Mini Version */
+        .metric-mini {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 0.8rem;
+            text-align: center;
+            border: 1px solid transparent;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            flex: 1;
+        }
+
+        .metric-mini:hover {
+            background: rgba(0, 0, 0, 0.4);
+            border-color: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .metric-value {
+            font-size: clamp(1.8rem, 3vw, 2.2rem);
+            font-weight: 800;
+            line-height: 1;
+            margin-bottom: 0.3rem;
+        }
+
+        .setup-freq .metric-value {
+            background: var(--accent-freq-grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .setup-nofreq .metric-value {
+            background: var(--accent-nofreq-grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        /* Image Display Mini - Increased length */
+        .image-mini {
+            flex: 0 0 160px;
+            height: 220px;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            background: #000;
+            border: 1px solid var(--glass-border);
+        }
+
+        .image-mini img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.5s ease;
+            opacity: 0.85;
+        }
+
+        .image-mini:hover img {
+            transform: scale(1.05);
+            opacity: 1;
+        }
+
+        .image-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 1rem 0.8rem 0.5rem;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .image-overlay span {
+            font-size: 0.7rem;
+            color: rgba(255, 255, 255, 0.9);
+            background: rgba(0, 0, 0, 0.6);
+            padding: 3px 8px;
+            border-radius: 12px;
+            backdrop-filter: blur(4px);
+        }
+
+        /* Main Charts Section Styles */
+        .main-charts-section {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .chart-card {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 16px;
+            padding: 1.2rem;
+            border: 1px solid var(--glass-border);
+            height: 320px;
+            display: flex;
+            flex-direction: column;
+            transition: border-color 0.3s;
+        }
+
+        .chart-card:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .chart-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 0.8rem;
+            text-align: left;
+            padding-left: 0.5rem;
+            border-left: 4px solid #a1a1aa;
+        }
+
+        .chart-wrapper {
+            flex-grow: 1;
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0% {
+                transform: scale(0.95);
+                opacity: 0.5;
+            }
+
+            50% {
+                transform: scale(1.3);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(0.95);
+                opacity: 0.5;
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(15px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Responsive Mobile Layout */
+        @media (max-width: 900px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .chart-card {
+                height: 280px;
+            }
+
+            .dashboard-wrapper {
+                padding-bottom: 2rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 0.5rem;
+            }
+
+            header h1 {
+                font-size: 1.8rem;
+            }
+
+            .glass-panel {
+                padding: 1rem;
+            }
+
+            .setup-content {
+                flex-direction: column;
+            }
+
+            .image-mini {
+                flex: none;
+                width: 100%;
+                max-width: 250px;
+                margin: 0 auto;
+            }
+
+            .metrics-column {
+                flex-direction: row;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="dashboard-wrapper">
+        <header>
+            <h1>Strawberry Growth Analysis</h1>
+            <p>Live monitoring of Frequency vs Non-Frequency plantation outcomes</p>
+        </header>
+
+        <!-- TOP LIVE DATA: SMALL CARDS -->
+        <div class="summary-section">
+
+            <!-- SETUP A: WITH FREQUENCY -->
+            <section class="glass-panel setup-card setup-freq">
+                <div class="setup-content">
+                    <div class="image-mini">
+                        <img id="img-freq"
+                            src="https://images.unsplash.com/photo-1595859702890-e88383ccf3bd?auto=format&fit=crop&q=80&w=400"
+                            alt="Capture (Freq)">
+                        <div class="image-overlay">
+                            <span>Latest Image</span>
+                            <span id="time-freq">--:--</span>
+                        </div>
+                    </div>
+                    <div class="metrics-column">
+                        <div class="section-header">
+                            <div class="status-dot"></div>
+                            <h2>Setup 01 (Frequency)</h2>
+                        </div>
+                        <div class="metric-mini">
+                            <div class="metric-value" id="temp-freq">--°C</div>
+                            <div class="metric-label">Temperature</div>
+                        </div>
+                        <div class="metric-mini">
+                            <div class="metric-value" id="moisture-freq">--%</div>
+                            <div class="metric-label">Soil Moisture</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SETUP B: WITHOUT FREQUENCY -->
+            <section class="glass-panel setup-card setup-nofreq">
+                <div class="setup-content">
+                    <div class="image-mini">
+                        <img id="img-nofreq"
+                            src="https://images.unsplash.com/photo-1518977672808-ee9a72c4edae?auto=format&fit=crop&q=80&w=400"
+                            alt="Capture (No Freq)">
+                        <div class="image-overlay">
+                            <span>Latest Image</span>
+                            <span id="time-nofreq">--:--</span>
+                        </div>
+                    </div>
+                    <div class="metrics-column">
+                        <div class="section-header">
+                            <div class="status-dot"></div>
+                            <h2>Setup 02 (No Freq)</h2>
+                        </div>
+                        <div class="metric-mini">
+                            <div class="metric-value" id="temp-nofreq">--°C</div>
+                            <div class="metric-label">Temperature</div>
+                        </div>
+                        <div class="metric-mini">
+                            <div class="metric-value" id="moisture-nofreq">--%</div>
+                            <div class="metric-label">Soil Moisture</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- MAIN CHARTS SECTION (PROMINENT AT BOTTOM) -->
+        <section class="glass-panel main-charts-section">
+            <div class="section-header"
+                style="justify-content: center; border-bottom: none; font-size: 1.5rem; margin-bottom: 0;">
+                <h2>Growth & Health Comparisons</h2>
+            </div>
+
+            <div class="charts-grid">
+                <!-- Leaf Size Chart -->
+                <div class="chart-card">
+                    <div class="chart-title">Average Leaf Size (cm²)</div>
+                    <div class="chart-wrapper">
+                        <canvas id="chartLeafSize"></canvas>
+                    </div>
+                </div>
+
+                <!-- Color Chart -->
+                <div class="chart-card">
+                    <div class="chart-title">Color Intensity Score</div>
+                    <div class="chart-wrapper">
+                        <canvas id="chartColor"></canvas>
+                    </div>
+                </div>
+
+                <!-- Leaves Count -->
+                <div class="chart-card">
+                    <div class="chart-title">Leaves Count per Plant</div>
+                    <div class="chart-wrapper">
+                        <canvas id="chartLeavesCount"></canvas>
+                    </div>
+                </div>
+
+                <!-- Plant Count -->
+                <div class="chart-card">
+                    <div class="chart-title">Total Living Plants</div>
+                    <div class="chart-wrapper">
+                        <canvas id="chartPlantCount"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        // Set Chart.js Defaults for Dark Mode Aesthetics
+        Chart.defaults.color = '#a1a1aa';
+        Chart.defaults.font.family = "'Outfit', sans-serif";
+        Chart.defaults.scale.grid.color = 'rgba(255, 255, 255, 0.05)';
+        Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+        Chart.defaults.plugins.tooltip.padding = 10;
+        Chart.defaults.plugins.tooltip.cornerRadius = 8;
+        Chart.defaults.maintainAspectRatio = false;
+
+        const freqColor = '#10b981'; // Emerald
+        const noFreqColor = '#f43f5e'; // Rose
+
+        // Reusable function to create basic bar charts
+        function initChart(canvasId, label1, label2) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            return new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'], // Sample timeframe
+                    datasets: [
+                        {
+                            label: 'With Frequency',
+                            data: [0, 0, 0, 0],
+                            backgroundColor: freqColor,
+                            borderRadius: 6,
+                            borderSkipped: false
+                        },
+                        {
+                            label: 'Without Frequency',
+                            data: [0, 0, 0, 0],
+                            backgroundColor: noFreqColor,
+                            borderRadius: 6,
+                            borderSkipped: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        // Initialize Charts
+        const chartLeafSize = initChart('chartLeafSize');
+        const chartColor = initChart('chartColor');
+        const chartLeavesCount = initChart('chartLeavesCount');
+        const chartPlantCount = initChart('chartPlantCount');
+
+        /**
+         * =============================================
+         * DATA FETCHING ALGORITHM
+         * =============================================
+         * Replace the "simulateDataFetch" content inside this function mapping
+         * with your real API endpoint. (e.g., using Google Apps Script Web App URL)
+         */
+        async function fetchSetupData(url, setupPrefix) {
+            try {
+                const response = await fetch(url + "?read=true");
+                const data = await response.json();
+                if (!data || !data.latest) return null;
+
+                // Update UI for the specific setup (freq or nofreq)
+                document.getElementById(`temp-${setupPrefix}`).textContent = data.latest.temp + '°C';
+                document.getElementById(`moisture-${setupPrefix}`).textContent = data.latest.moisture + '%';
+                
+                const timestamp = new Date(data.latest.timestamp);
+                document.getElementById(`time-${setupPrefix}`).textContent = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                if (data.latest.image) {
+                    document.getElementById(`img-${setupPrefix}`).src = data.latest.image;
+                }
+                return data;
+            } catch (error) {
+                console.error(`Error fetching data for ${setupPrefix}: `, error);
+                return null;
+            }
+        }
+
+        async function fetchSystemData() {
+            const dataFreq = await fetchSetupData(googleScriptUrlFreq, 'freq');
+            const dataNoFreq = await fetchSetupData(googleScriptUrlNoFreq, 'nofreq');
+
+            // Update Charts with aggregated history
+            if (dataFreq && dataFreq.history) {
+                const labels = dataFreq.history.map(h => {
+                    const d = new Date(h.timestamp);
+                    return d.getHours() + ":" + d.getMinutes();
+                });
+                chartLeafSize.data.labels = labels;
+                chartLeafSize.data.datasets[0].data = dataFreq.history.map(h => h.moisture);
+                chartColor.data.labels = labels;
+                chartColor.data.datasets[0].data = dataFreq.history.map(h => h.temp);
+            }
+
+            if (dataNoFreq && dataNoFreq.history) {
+                chartLeafSize.data.datasets[1].data = dataNoFreq.history.map(h => h.moisture);
+                chartColor.data.datasets[1].data = dataNoFreq.history.map(h => h.temp);
+            }
+
+            chartLeafSize.update();
+            chartColor.update();
+        }
+
+        // IMPORTANT: Set your Google Script Web App URLs here!
+        const googleScriptUrlFreq = "REPLACE_WITH_SETUP_01_URL";
+        const googleScriptUrlNoFreq = "REPLACE_WITH_SETUP_02_URL";
+
+        // Initialize immediately and update every 30 seconds
+        fetchSystemData();
+        setInterval(fetchSystemData, 30000);
+
+    </script>
+</body>
+
+</html>
