@@ -596,7 +596,8 @@
                 if (!data || !data.latest) return;
 
                 const latest = data.latest;
-                document.getElementById('outside-temp').textContent = latest.outside_temp ? parseFloat(latest.outside_temp).toFixed(1) + '°C' : '--°C';
+                console.log("Latest data received:", latest);
+                document.getElementById('outside-temp').textContent = (latest.outside_temp !== null && latest.outside_temp !== undefined && latest.outside_temp !== "") ? parseFloat(latest.outside_temp).toFixed(1) + '°C' : '--°C';
 
                 if (latest.box01) {
                     document.getElementById('temp-freq').textContent = latest.box01.temp ? parseFloat(latest.box01.temp).toFixed(1) + '°C' : '--°C';
