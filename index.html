@@ -2,81 +2,49 @@
   ==========================================================================
   GOOGLE APPS SCRIPT BACKEND CODE (Paste this into Code.gs)
   ==========================================================================
-  IMPORTANT: You must follow these steps TWICE (once for each setup: Setup 1 and Setup 2)
-  
-  1. Open your Google Sheet (for Setup 1 or 2).
+  1. Open your Google Sheet.
   2. Extensions > Apps Script.
-  3. Create index.html and paste everything below this comment block into it.
-  4. Paste the code below in Code.gs.
-  5. Replace FOLDER_ID with the ID for THIS setup's drive folder.
-  6. Deploy as Web App (Access: Anyone).
+  3. Create Code.gs and paste the code below.
+  4. Deploy as Web App (Access: Anyone).
   
-  const FOLDER_ID = 'YOUR_DRIVE_FOLDER_ID'; // Change this for EACH setup!
-
   function doGet(e) {
     if (e.parameter.read) {
       const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
       const data = sheet.getDataRange().getValues();
       const headers = data.shift();
-      const latestRow = data[data.length - 1];
+      const latestRow = data[data.length - 1] || [];
       
-      let latestImageUrl = "";
-      try {
-        const folder = DriveApp.getFolderById(FOLDER_ID);
-        const files = folder.getFilesByType(MimeType.JPEG);
-        let latestFile = null;
-        let maxTimestamp = 0;
-        while (files.hasNext()) {
-          const file = files.next();
-          const name = file.getName();
-          const timestampMatch = name.match(/\d+/);
-          if (timestampMatch) {
-            const ts = parseInt(timestampMatch[0]);
-            if (ts > maxTimestamp) {
-              maxTimestamp = ts;
-              latestFile = file;
-            }
-          }
-        }
-        if (latestFile) {
-          latestImageUrl = latestFile.getUrl().replace("open?id=", "uc?export=view&id=");
-        }
-      } catch (fErr) { console.log(fErr); }
-      
-      const historyData = data.slice(-10);
       const response = {
         latest: {
-          timestamp: latestRow ? latestRow[0] : null,
-          moisture: latestRow ? latestRow[1] : null,
-          temp: latestRow ? latestRow[2] : null,
-          image: latestImageUrl || (latestRow ? latestRow[3] : "")
+          timestamp: latestRow[0] || null,
+          outside_temp: latestRow[1] || null,
+          box01: {
+            temp: latestRow[2] || null,
+            drip: latestRow[3] || null,
+            leaves: latestRow[4] || null,
+            plant: latestRow[5] || null
+          },
+          box02: {
+            temp: latestRow[8] || null,
+            drip: latestRow[9] || null,
+            leaves: latestRow[10] || null,
+            plant: latestRow[11] || null
+          }
         },
-        history: historyData.map(row => ({ timestamp: row[0], moisture: row[1], temp: row[2] }))
+        history: data.slice(-20).map(row => ({
+          timestamp: row[0],
+          outside_temp: row[1],
+          box01_temp: row[2],
+          box01_leaves: row[4],
+          box01_plant: row[5],
+          box02_temp: row[8],
+          box02_leaves: row[10],
+          box02_plant: row[11]
+        }))
       };
       return ContentService.createTextOutput(JSON.stringify(response)).setMimeType(ContentService.MimeType.JSON);
     }
-    const val = e.parameter.value;
-    const temp = e.parameter.temp;
-    if (val && temp) {
-      const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-      sheet.appendRow([new Date(), val, temp, e.parameter.image || ""]);
-      return ContentService.createTextOutput("Data Logged Successfully");
-    }
-    return ContentService.createTextOutput("Google Apps Script API is Running.");
-  }
-
-  function doPost(e) {
-    try {
-      const data = JSON.parse(e.postData.contents);
-      if (data.action === 'uploadImage') {
-        const folder = DriveApp.getFolderById(FOLDER_ID);
-        const fileName = "Plant_" + new Date().getTime() + ".jpg";
-        const blob = Utilities.newBlob(Utilities.base64Decode(data.image), "image/jpeg", fileName);
-        const file = folder.createFile(blob);
-        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        return ContentService.createTextOutput(file.getUrl().replace("open?id=", "uc?export=view&id="));
-      }
-    } catch (err) { return ContentService.createTextOutput("Error: " + err.toString()); }
+    return ContentService.createTextOutput("API is Running. Use ?read=true to fetch data.");
   }
   ==========================================================================
 -->
@@ -152,6 +120,7 @@
             letter-spacing: -1px;
             background: linear-gradient(90deg, #ffffff, #a1a1aa);
             -webkit-background-clip: text;
+            background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 0.3rem;
         }
@@ -161,6 +130,46 @@
             font-size: clamp(0.9rem, 2vw, 1.1rem);
             max-width: 600px;
             margin: 0 auto;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Premium Button Styles */
+        .btn-premium {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.6rem 1.2rem;
+            background: var(--glass-bg);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid var(--glass-border);
+            border-radius: 30px;
+            color: var(--text-main);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn-premium:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--glass-hover-border);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.2);
+            color: #fff;
+        }
+
+        .btn-premium i {
+            font-size: 1rem;
+        }
+
+        .btn-premium svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
         }
 
         /* Glass Panel Components */
@@ -257,7 +266,7 @@
         }
 
         .metric-value {
-            font-size: clamp(1.8rem, 3vw, 2.2rem);
+            font-size: clamp(1.6rem, 2.5vw, 2rem);
             font-weight: 800;
             line-height: 1;
             margin-bottom: 0.3rem;
@@ -266,24 +275,26 @@
         .setup-freq .metric-value {
             background: var(--accent-freq-grad);
             -webkit-background-clip: text;
+            background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
         .setup-nofreq .metric-value {
             background: var(--accent-nofreq-grad);
             -webkit-background-clip: text;
+            background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
         .metric-label {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 1px;
             font-weight: 600;
         }
 
-        /* Image Display Mini - Increased length */
+        /* Image Display Mini */
         .image-mini {
             flex: 0 0 160px;
             height: 220px;
@@ -337,7 +348,7 @@
 
         .charts-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 1.5rem;
             margin-top: 1rem;
         }
@@ -376,100 +387,51 @@
 
         /* Animations */
         @keyframes pulse {
-            0% {
-                transform: scale(0.95);
-                opacity: 0.5;
-            }
-
-            50% {
-                transform: scale(1.3);
-                opacity: 1;
-            }
-
-            100% {
-                transform: scale(0.95);
-                opacity: 0.5;
-            }
+            0% { transform: scale(0.95); opacity: 0.5;}
+            50% { transform: scale(1.3); opacity: 1;}
+            100% { transform: scale(0.95); opacity: 0.5;}
         }
 
         @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(15px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         /* Responsive Mobile Layout */
         @media (max-width: 900px) {
-            .charts-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .chart-card {
-                height: 280px;
-            }
-
-            .dashboard-wrapper {
-                padding-bottom: 2rem;
-            }
-        }
-
-        @media (max-width: 480px) {
-            body {
-                padding: 0.5rem;
-            }
-
-            header h1 {
-                font-size: 1.8rem;
-            }
-
-            .glass-panel {
-                padding: 1rem;
-            }
-
-            .setup-content {
-                flex-direction: column;
-            }
-
-            .image-mini {
-                flex: none;
-                width: 100%;
-                max-width: 250px;
-                margin: 0 auto;
-            }
-
-            .metrics-column {
-                flex-direction: row;
-            }
+            .charts-grid { grid-template-columns: 1fr; }
+            .chart-card { height: 280px; }
         }
     </style>
 </head>
 
 <body>
-
     <div class="dashboard-wrapper">
         <header>
             <h1>Strawberry Growth Analysis</h1>
             <p>Live monitoring of Frequency vs Non-Frequency plantation outcomes</p>
+            <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; margin-top: 1rem;">
+                <div class="glass-panel" style="padding: 0.6rem 1.4rem; display: flex; align-items: center; gap: 12px; border-radius: 30px;">
+                    <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Outside Temp:</span>
+                    <span id="outside-temp" style="font-size: 1.3rem; font-weight: 800; color: #fff;">--°C</span>
+                </div>
+                <a href="https://forms.gle/Y75wzoXoSajkKK5LA" target="_blank" class="btn-premium">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2m-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
+                    </svg>
+                    Manual Data Entry
+                </a>
+            </div>
         </header>
 
-        <!-- TOP LIVE DATA: SMALL CARDS -->
         <div class="summary-section">
-
-            <!-- SETUP A: WITH FREQUENCY -->
+            <!-- SETUP 01: WITH FREQUENCY -->
             <section class="glass-panel setup-card setup-freq">
                 <div class="setup-content">
                     <div class="image-mini">
-                        <img id="img-freq"
-                            src="https://images.unsplash.com/photo-1595859702890-e88383ccf3bd?auto=format&fit=crop&q=80&w=400"
-                            alt="Capture (Freq)">
+                        <img id="img-freq" src="https://images.unsplash.com/photo-1595859702890-e88383ccf3bd?auto=format&fit=crop&q=80&w=400" alt="Setup 01">
                         <div class="image-overlay">
-                            <span>Latest Image</span>
+                            <span>Box 01</span>
                             <span id="time-freq">--:--</span>
                         </div>
                     </div>
@@ -478,27 +440,35 @@
                             <div class="status-dot"></div>
                             <h2>Setup 01 (Frequency)</h2>
                         </div>
-                        <div class="metric-mini">
-                            <div class="metric-value" id="temp-freq">--°C</div>
-                            <div class="metric-label">Temperature</div>
-                        </div>
-                        <div class="metric-mini">
-                            <div class="metric-value" id="moisture-freq">--%</div>
-                            <div class="metric-label">Soil Moisture</div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem;">
+                            <div class="metric-mini">
+                                <div class="metric-value" id="temp-freq">--°C</div>
+                                <div class="metric-label">Temp</div>
+                            </div>
+                            <div class="metric-mini">
+                                <div class="metric-value" id="drip-freq">--</div>
+                                <div class="metric-label">Drip Count</div>
+                            </div>
+                            <div class="metric-mini" style="background: rgba(16, 185, 129, 0.05);">
+                                <div class="metric-value" id="leaves-freq" style="font-size: 1.4rem;">--</div>
+                                <div class="metric-label">Leaves</div>
+                            </div>
+                            <div class="metric-mini" style="background: rgba(16, 185, 129, 0.05);">
+                                <div class="metric-value" id="plant-freq" style="font-size: 1.4rem;">--</div>
+                                <div class="metric-label">Plants</div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </section>
 
-            <!-- SETUP B: WITHOUT FREQUENCY -->
+            <!-- SETUP 02: WITHOUT FREQUENCY -->
             <section class="glass-panel setup-card setup-nofreq">
                 <div class="setup-content">
                     <div class="image-mini">
-                        <img id="img-nofreq"
-                            src="https://images.unsplash.com/photo-1518977672808-ee9a72c4edae?auto=format&fit=crop&q=80&w=400"
-                            alt="Capture (No Freq)">
+                        <img id="img-nofreq" src="https://images.unsplash.com/photo-1518977672808-ee9a72c4edae?auto=format&fit=crop&q=80&w=400" alt="Setup 02">
                         <div class="image-overlay">
-                            <span>Latest Image</span>
+                            <span>Box 02</span>
                             <span id="time-nofreq">--:--</span>
                         </div>
                     </div>
@@ -507,181 +477,142 @@
                             <div class="status-dot"></div>
                             <h2>Setup 02 (No Freq)</h2>
                         </div>
-                        <div class="metric-mini">
-                            <div class="metric-value" id="temp-nofreq">--°C</div>
-                            <div class="metric-label">Temperature</div>
-                        </div>
-                        <div class="metric-mini">
-                            <div class="metric-value" id="moisture-nofreq">--%</div>
-                            <div class="metric-label">Soil Moisture</div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem;">
+                            <div class="metric-mini">
+                                <div class="metric-value" id="temp-nofreq">--°C</div>
+                                <div class="metric-label">Temp</div>
+                            </div>
+                            <div class="metric-mini">
+                                <div class="metric-value" id="drip-nofreq">--</div>
+                                <div class="metric-label">Drip Count</div>
+                            </div>
+                            <div class="metric-mini" style="background: rgba(244, 63, 94, 0.05);">
+                                <div class="metric-value" id="leaves-nofreq" style="font-size: 1.4rem;">--</div>
+                                <div class="metric-label">Leaves</div>
+                            </div>
+                            <div class="metric-mini" style="background: rgba(244, 63, 94, 0.05);">
+                                <div class="metric-value" id="plant-nofreq" style="font-size: 1.4rem;">--</div>
+                                <div class="metric-label">Plants</div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </section>
         </div>
 
-        <!-- MAIN CHARTS SECTION (PROMINENT AT BOTTOM) -->
         <section class="glass-panel main-charts-section">
-            <div class="section-header"
-                style="justify-content: center; border-bottom: none; font-size: 1.5rem; margin-bottom: 0;">
+            <div class="section-header" style="justify-content: center; border-bottom: none; font-size: 1.4rem;">
                 <h2>Growth & Health Comparisons</h2>
             </div>
-
             <div class="charts-grid">
-                <!-- Leaf Size Chart -->
                 <div class="chart-card">
-                    <div class="chart-title">Average Leaf Size (cm²)</div>
-                    <div class="chart-wrapper">
-                        <canvas id="chartLeafSize"></canvas>
-                    </div>
+                    <div class="chart-title">Temperature Comparison (°C)</div>
+                    <div class="chart-wrapper"><canvas id="chartTemp"></canvas></div>
                 </div>
-
-                <!-- Color Chart -->
                 <div class="chart-card">
-                    <div class="chart-title">Color Intensity Score</div>
-                    <div class="chart-wrapper">
-                        <canvas id="chartColor"></canvas>
-                    </div>
+                    <div class="chart-title">Leaves Count per Setup</div>
+                    <div class="chart-wrapper"><canvas id="chartLeaves"></canvas></div>
                 </div>
-
-                <!-- Leaves Count -->
-                <div class="chart-card">
-                    <div class="chart-title">Leaves Count per Plant</div>
-                    <div class="chart-wrapper">
-                        <canvas id="chartLeavesCount"></canvas>
-                    </div>
-                </div>
-
-                <!-- Plant Count -->
                 <div class="chart-card">
                     <div class="chart-title">Total Living Plants</div>
-                    <div class="chart-wrapper">
-                        <canvas id="chartPlantCount"></canvas>
-                    </div>
+                    <div class="chart-wrapper"><canvas id="chartPlant"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">Drip Count (Activity)</div>
+                    <div class="chart-wrapper"><canvas id="chartDrip"></canvas></div>
                 </div>
             </div>
         </section>
     </div>
 
     <script>
-        // Set Chart.js Defaults for Dark Mode Aesthetics
         Chart.defaults.color = '#a1a1aa';
         Chart.defaults.font.family = "'Outfit', sans-serif";
         Chart.defaults.scale.grid.color = 'rgba(255, 255, 255, 0.05)';
-        Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-        Chart.defaults.plugins.tooltip.padding = 10;
-        Chart.defaults.plugins.tooltip.cornerRadius = 8;
         Chart.defaults.maintainAspectRatio = false;
 
-        const freqColor = '#10b981'; // Emerald
-        const noFreqColor = '#f43f5e'; // Rose
+        const freqColor = '#10b981';
+        const noFreqColor = '#f43f5e';
 
-        // Reusable function to create basic bar charts
         function initChart(canvasId, label1, label2) {
             const ctx = document.getElementById(canvasId).getContext('2d');
             return new Chart(ctx, {
-                type: 'bar',
+                type: 'line',
                 data: {
-                    labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'], // Sample timeframe
+                    labels: [],
                     datasets: [
-                        {
-                            label: 'With Frequency',
-                            data: [0, 0, 0, 0],
-                            backgroundColor: freqColor,
-                            borderRadius: 6,
-                            borderSkipped: false
-                        },
-                        {
-                            label: 'Without Frequency',
-                            data: [0, 0, 0, 0],
-                            backgroundColor: noFreqColor,
-                            borderRadius: 6,
-                            borderSkipped: false
-                        }
+                        { label: 'With Frequency', data: [], borderColor: freqColor, backgroundColor: freqColor + '22', fill: true, tension: 0.4 },
+                        { label: 'No Frequency', data: [], borderColor: noFreqColor, backgroundColor: noFreqColor + '22', fill: true, tension: 0.4 }
                     ]
                 },
                 options: {
                     responsive: true,
-                    plugins: {
-                        legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } }
-                    },
-                    scales: {
-                        y: { beginAtZero: true }
-                    }
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, usePointStyle: true } } },
+                    scales: { y: { beginAtZero: true } }
                 }
             });
         }
 
-        // Initialize Charts
-        const chartLeafSize = initChart('chartLeafSize');
-        const chartColor = initChart('chartColor');
-        const chartLeavesCount = initChart('chartLeavesCount');
-        const chartPlantCount = initChart('chartPlantCount');
-
-        /**
-         * =============================================
-         * DATA FETCHING ALGORITHM
-         * =============================================
-         * Replace the "simulateDataFetch" content inside this function mapping
-         * with your real API endpoint. (e.g., using Google Apps Script Web App URL)
-         */
-        async function fetchSetupData(url, setupPrefix) {
-            try {
-                const response = await fetch(url + "?read=true");
-                const data = await response.json();
-                if (!data || !data.latest) return null;
-
-                // Update UI for the specific setup (freq or nofreq)
-                document.getElementById(`temp-${setupPrefix}`).textContent = data.latest.temp + '°C';
-                document.getElementById(`moisture-${setupPrefix}`).textContent = data.latest.moisture + '%';
-                
-                const timestamp = new Date(data.latest.timestamp);
-                document.getElementById(`time-${setupPrefix}`).textContent = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-                if (data.latest.image) {
-                    document.getElementById(`img-${setupPrefix}`).src = data.latest.image;
-                }
-                return data;
-            } catch (error) {
-                console.error(`Error fetching data for ${setupPrefix}: `, error);
-                return null;
-            }
-        }
+        const chartTemp = initChart('chartTemp');
+        const chartLeaves = initChart('chartLeaves');
+        const chartPlant = initChart('chartPlant');
+        const chartDrip = initChart('chartDrip');
 
         async function fetchSystemData() {
-            const dataFreq = await fetchSetupData(googleScriptUrlFreq, 'freq');
-            const dataNoFreq = await fetchSetupData(googleScriptUrlNoFreq, 'nofreq');
+            try {
+                const response = await fetch(googleScriptUrl + "?read=true");
+                const data = await response.json();
+                if (!data || !data.latest) return;
 
-            // Update Charts with aggregated history
-            if (dataFreq && dataFreq.history) {
-                const labels = dataFreq.history.map(h => {
-                    const d = new Date(h.timestamp);
-                    return d.getHours() + ":" + d.getMinutes();
-                });
-                chartLeafSize.data.labels = labels;
-                chartLeafSize.data.datasets[0].data = dataFreq.history.map(h => h.moisture);
-                chartColor.data.labels = labels;
-                chartColor.data.datasets[0].data = dataFreq.history.map(h => h.temp);
-            }
+                const latest = data.latest;
+                document.getElementById('outside-temp').textContent = latest.outside_temp ? parseFloat(latest.outside_temp).toFixed(1) + '°C' : '--°C';
 
-            if (dataNoFreq && dataNoFreq.history) {
-                chartLeafSize.data.datasets[1].data = dataNoFreq.history.map(h => h.moisture);
-                chartColor.data.datasets[1].data = dataNoFreq.history.map(h => h.temp);
-            }
+                if (latest.box01) {
+                    document.getElementById('temp-freq').textContent = latest.box01.temp ? parseFloat(latest.box01.temp).toFixed(1) + '°C' : '--°C';
+                    document.getElementById('drip-freq').textContent = latest.box01.drip || '--';
+                    document.getElementById('leaves-freq').textContent = latest.box01.leaves || '--';
+                    document.getElementById('plant-freq').textContent = latest.box01.plant || '--';
+                }
+                if (latest.box02) {
+                    document.getElementById('temp-nofreq').textContent = latest.box02.temp ? parseFloat(latest.box02.temp).toFixed(1) + '°C' : '--°C';
+                    document.getElementById('drip-nofreq').textContent = latest.box02.drip || '--';
+                    document.getElementById('leaves-nofreq').textContent = latest.box02.leaves || '--';
+                    document.getElementById('plant-nofreq').textContent = latest.box02.plant || '--';
+                }
 
-            chartLeafSize.update();
-            chartColor.update();
+                const timeStr = new Date(latest.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                document.getElementById('time-freq').textContent = timeStr;
+                document.getElementById('time-nofreq').textContent = timeStr;
+
+                if (data.history) {
+                    const labels = data.history.map(h => new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                    
+                    chartTemp.data.labels = labels;
+                    chartTemp.data.datasets[0].data = data.history.map(h => h.box01_temp);
+                    chartTemp.data.datasets[1].data = data.history.map(h => h.box02_temp);
+                    chartTemp.update();
+
+                    chartLeaves.data.labels = labels;
+                    chartLeaves.data.datasets[0].data = data.history.map(h => h.box01_leaves);
+                    chartLeaves.data.datasets[1].data = data.history.map(h => h.box02_leaves);
+                    chartLeaves.update();
+
+                    chartPlant.data.labels = labels;
+                    chartPlant.data.datasets[0].data = data.history.map(h => h.box01_plant);
+                    chartPlant.data.datasets[1].data = data.history.map(h => h.box02_plant);
+                    chartPlant.update();
+
+                    chartDrip.data.labels = labels;
+                    chartDrip.data.datasets[0].data = data.history.map(h => h.box01_drip);
+                    chartDrip.data.datasets[1].data = data.history.map(h => h.box02_drip);
+                    chartDrip.update();
+                }
+            } catch (err) { console.error("Fetch Error:", err); }
         }
 
-        // IMPORTANT: Set your Google Script Web App URLs here!
-        const googleScriptUrlFreq = "https://script.google.com/macros/s/AKfycbwtkzEazVs7-xAn-wRRAfJb2PlPBQaPIyWNjapCvXkxF6y2P5-ZIi0nKZk8t5Gfq7eBVQ/exec";
-        const googleScriptUrlNoFreq = "REPLACE_WITH_SETUP_02_URL";
-
-        // Initialize immediately and update every 30 seconds
+        const googleScriptUrl = "https://script.google.com/macros/s/AKfycbwtkzEazVs7-xAn-wRRAfJb2PlPBQaPIyWNjapCvXkxF6y2P5-ZIi0nKZk8t5Gfq7eBVQ/exec";
         fetchSystemData();
         setInterval(fetchSystemData, 30000);
-
     </script>
 </body>
-
 </html>
