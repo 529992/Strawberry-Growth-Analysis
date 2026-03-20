@@ -387,20 +387,43 @@
 
         /* Animations */
         @keyframes pulse {
-            0% { transform: scale(0.95); opacity: 0.5;}
-            50% { transform: scale(1.3); opacity: 1;}
-            100% { transform: scale(0.95); opacity: 0.5;}
+            0% {
+                transform: scale(0.95);
+                opacity: 0.5;
+            }
+
+            50% {
+                transform: scale(1.3);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(0.95);
+                opacity: 0.5;
+            }
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(15px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(15px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         /* Responsive Mobile Layout */
         @media (max-width: 900px) {
-            .charts-grid { grid-template-columns: 1fr; }
-            .chart-card { height: 280px; }
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .chart-card {
+                height: 280px;
+            }
         }
     </style>
 </head>
@@ -411,13 +434,17 @@
             <h1>Strawberry Growth Analysis</h1>
             <p>Live monitoring of Frequency vs Non-Frequency plantation outcomes</p>
             <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; margin-top: 1rem;">
-                <div class="glass-panel" style="padding: 0.6rem 1.4rem; display: flex; align-items: center; gap: 12px; border-radius: 30px;">
-                    <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Outside Temp:</span>
+                <div class="glass-panel"
+                    style="padding: 0.6rem 1.4rem; display: flex; align-items: center; gap: 12px; border-radius: 30px;">
+                    <span
+                        style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Outside
+                        Temp:</span>
                     <span id="outside-temp" style="font-size: 1.3rem; font-weight: 800; color: #fff;">--°C</span>
                 </div>
                 <a href="https://forms.gle/Y75wzoXoSajkKK5LA" target="_blank" class="btn-premium">
                     <svg viewBox="0 0 24 24">
-                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2m-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
+                        <path
+                            d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2m-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z" />
                     </svg>
                     Manual Data Entry
                 </a>
@@ -429,7 +456,9 @@
             <section class="glass-panel setup-card setup-freq">
                 <div class="setup-content">
                     <div class="image-mini">
-                        <img id="img-freq" src="https://images.unsplash.com/photo-1595859702890-e88383ccf3bd?auto=format&fit=crop&q=80&w=400" alt="Setup 01">
+                        <img id="img-freq"
+                            src="https://images.unsplash.com/photo-1595859702890-e88383ccf3bd?auto=format&fit=crop&q=80&w=400"
+                            alt="Setup 01">
                         <div class="image-overlay">
                             <span>Box 01</span>
                             <span id="time-freq">--:--</span>
@@ -466,7 +495,9 @@
             <section class="glass-panel setup-card setup-nofreq">
                 <div class="setup-content">
                     <div class="image-mini">
-                        <img id="img-nofreq" src="https://images.unsplash.com/photo-1518977672808-ee9a72c4edae?auto=format&fit=crop&q=80&w=400" alt="Setup 02">
+                        <img id="img-nofreq"
+                            src="https://images.unsplash.com/photo-1518977672808-ee9a72c4edae?auto=format&fit=crop&q=80&w=400"
+                            alt="Setup 02">
                         <div class="image-overlay">
                             <span>Box 02</span>
                             <span id="time-nofreq">--:--</span>
@@ -586,7 +617,7 @@
 
                 if (data.history) {
                     const labels = data.history.map(h => new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-                    
+
                     chartTemp.data.labels = labels;
                     chartTemp.data.datasets[0].data = data.history.map(h => h.box01_temp);
                     chartTemp.data.datasets[1].data = data.history.map(h => h.box02_temp);
@@ -610,9 +641,10 @@
             } catch (err) { console.error("Fetch Error:", err); }
         }
 
-        const googleScriptUrl = "https://script.google.com/macros/s/AKfycbwtkzEazVs7-xAn-wRRAfJb2PlPBQaPIyWNjapCvXkxF6y2P5-ZIi0nKZk8t5Gfq7eBVQ/exec";
+        const googleScriptUrl = "https://script.google.com/macros/s/AKfycbzgcKAbLKwBwJZJCrwtckm819ohMCm-3e_NbQNYP35HVUjKoMP_OM6mFWSCh3KCNWDu/exec";
         fetchSystemData();
         setInterval(fetchSystemData, 30000);
     </script>
 </body>
+
 </html>
